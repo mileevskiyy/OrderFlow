@@ -8,5 +8,5 @@ export interface Payment{event_id:string;outcome:string;amount_cents:number;effe
 export interface Activity{id:string;reference:string|null;order_id:string|null;action:string;detail:string;created_at:string}
 export interface OrderDetail extends Order{lines:OrderLine[];payments:Payment[];returns:{id:string;refund_cents:number;reason:string;created_at:string}[];timeline:Activity[]}
 export interface Overview{orders:{total:number;awaiting_payment:number;ready_to_ship:number;net_paid_cents:number;refunded_cents:number};stock:{on_hand:number;reserved:number;available:number;low_stock_positions:number};products:number}
-export interface Session{authenticated:boolean;username:string;csrfToken:string}
+export interface Session{authenticated:boolean;username:string;csrfToken:string;publicDemo:boolean}
 export interface Movement{id:string;warehouse_name:string;name:string;sku:string;reference:string|null;kind:string;on_hand_delta:number;reserved_delta:number;reason:string;created_at:string}

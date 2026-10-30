@@ -40,6 +40,12 @@ The application treats available inventory, historical order prices and retry-sa
 
 JDBC was selected to keep lock acquisition and inventory updates visible in the domain code. H2 provides a self-contained local setup; PostgreSQL is supported through the JDBC driver and the same Flyway migration.
 
+## Disposable public demo
+
+Set `PUBLIC_DEMO=true` with an in-memory H2 URL, `SEED_DEMO=true`, secure cookies and explicit operator credentials. Visitors can enter using **Try the demo** without receiving the server credential. CSRF and session checks remain enabled. The public-demo endpoint is absent unless this mode is explicitly enabled, and startup rejects public demo mode with persistent storage.
+
+All visitors share the same fictional workspace until the process stops. On restart, its in-memory records disappear and the initial sample dataset is recreated. This does not provide per-visitor isolation or durable storage. PostgreSQL remains available for a later persistent deployment.
+
 ## Start locally
 
 Requirements: **Java 21**, **Node.js 24** and npm. A system Maven installation is unnecessary: `mvnw` downloads Apache Maven 3.9.16 into the ignored `.tools` directory and verifies the distribution's SHA-512 checksum.

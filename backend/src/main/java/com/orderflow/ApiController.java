@@ -6,13 +6,15 @@ import org.springframework.http.ResponseEntity;
 import jakarta.validation.Valid;
 import java.util.*;
 import static com.orderflow.Contracts.*;
+import org.springframework.beans.factory.annotation.Value;
 
 @RestController @RequestMapping("/api")
 public class ApiController {
  private final OperationsService service;
+ @Value("${orderflow.public-demo}") private boolean publicDemo;
  public ApiController(OperationsService service){this.service=service;}
  @GetMapping("/health") public Map<String,Object> health(){return Map.of("status","ok","application","OrderFlow","payments","simulated");}
- @GetMapping("/session") public Map<String,Object> session(Authentication auth,CsrfToken csrf){return Map.of("authenticated",auth!=null&&auth.isAuthenticated(),"username",auth==null?"":auth.getName(),"csrfToken",csrf.getToken());}
+ @GetMapping("/session") public Map<String,Object> session(Authentication auth,CsrfToken csrf){return Map.of("authenticated",auth!=null&&auth.isAuthenticated(),"username",auth==null?"":auth.getName(),"csrfToken",csrf.getToken(),"publicDemo",publicDemo);}
  @GetMapping("/overview") public Object overview(){return service.overview();}
  @GetMapping("/products") public Object products(){return service.products();}
  @PostMapping("/products") public ResponseEntity<?> product(@Valid @RequestBody ProductInput input){return ResponseEntity.status(201).body(service.createProduct(input));}
