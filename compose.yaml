@@ -1,0 +1,30 @@
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: orderflow
+      POSTGRES_USER: orderflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - orderflow-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orderflow -d orderflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  app:
+    build: .
+    ports:
+      - "127.0.0.1:3200:3200"
+    environment:
+      JDBC_DATABASE_URL: jdbc:postgresql://db:5432/orderflow
+      DB_USER: orderflow
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      OPERATOR_USERNAME: ${OPERATOR_USERNAME:-operator}
+      OPERATOR_PASSWORD: ${OPERATOR_PASSWORD:?Set OPERATOR_PASSWORD in .env}
+      SEED_DEMO: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+volumes:
+  orderflow-db:

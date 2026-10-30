@@ -1,0 +1,2 @@
+import{defineConfig}from'@playwright/test';
+export default defineConfig({testDir:'./visual',use:{baseURL:'http://127.0.0.1:3201',viewport:{width:1440,height:1000}},webServer:{command:"PORT=3201 JDBC_DATABASE_URL='jdbc:h2:mem:visual;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE' SEED_DEMO=true ../scripts/start.sh",url:'http://127.0.0.1:3201/api/health',timeout:120000,reuseExistingServer:false},reporter:'list'});

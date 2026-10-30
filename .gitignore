@@ -1,0 +1,17 @@
+.tools/
+.env
+.env.*
+!.env.example
+data/
+backend/target/
+frontend/node_modules/
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
+.DS_Store
+*.log
+*.db
+*.mv.db
+*.trace.db
+
+backend/src/main/resources/static/
