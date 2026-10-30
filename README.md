@@ -1,5 +1,9 @@
 # OrderFlow
 
+[![Live demo](https://img.shields.io/badge/Live_demo-Try_OrderFlow-111111?style=for-the-badge)](https://orderflow-demo-hsq1.onrender.com/)
+
+**[Open the live demo](https://orderflow-demo-hsq1.onrender.com/)** · Select **Try the demo**; no account or password needed. The free server may take about a minute to wake. Visitors share synthetic data that resets on server restart. Payments are simulated.
+
 **An order and inventory operations workspace built around transactional correctness.**
 
 OrderFlow connects product catalog management, multi-warehouse inventory, order reservations, simulated payment events, fulfillment and partial returns. The backend is built with **Java 21, Spring Boot 4, Spring Security, JDBC and Flyway**; the operator interface uses **React and TypeScript**.
