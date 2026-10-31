@@ -1,5 +1,7 @@
 name: OrderFlow checks
 on: [push, pull_request]
+permissions:
+  contents: read
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -38,12 +40,26 @@ jobs:
           DB_PASSWORD: ci-test-password
       - run: npx playwright install --with-deps chromium
         working-directory: frontend
-      - run: npm run test:e2e
-        working-directory: frontend
+      - name: Check out pinned QualityHub integration target
+        uses: actions/checkout@v4
+        with:
+          repository: mileevskiyy/QualityHub
+          ref: ffa30ef4822f01b6b1c2bb404836a8f76c87af19
+          path: .qualityhub
+          persist-credentials: false
+      - name: Install integration target dependencies
+        run: npm ci --prefix .qualityhub
+      - name: Verify actual browser evidence delivery to QualityHub
+        run: node scripts/qualityhub-ci.mjs
+        env:
+          QUALITYHUB_CHECKOUT: .qualityhub
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
           name: orderflow-test-evidence
+          include-hidden-files: true
+          retention-days: 7
           path: |
+            .qualityhub-evidence
             backend/target/surefire-reports
             frontend/playwright-report

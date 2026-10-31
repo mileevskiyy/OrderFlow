@@ -4,6 +4,10 @@
 
 Product catalog, warehouses, stock receipts, transactional reservations, order lifecycle, simulated payment events, fulfillment, partial returns, ledger reconciliation, session authentication, React operator interface, Flyway migrations and verification suite.
 
+## Implemented: connected QA evidence
+
+Actual OrderFlow browser workflow delivery to QualityHub, pinned reporter/target, source context, controlled-failure/recovery comparison, attachment hash verification and replay checks. CI exports the experiment evidence. This is separate from the planned business-domain changes below.
+
 ## Next milestones
 
 1. Reservation expiry with an explicit cancellation policy and restart-safe scheduling.

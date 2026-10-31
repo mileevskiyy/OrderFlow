@@ -1,5 +1,18 @@
 # Verification record
 
+## Connected QA upgrade — 31 October 2026
+
+- `npm run build --prefix frontend`: passed.
+- `node scripts/qualityhub-ci.mjs`: passed against the packaged Java service and sibling QualityHub checkout.
+- A controlled HTTP 503 was actually injected at order creation; its browser invocation failed as required. The same workflow without the injection passed.
+- Both completed runs arrived through the reporter with seven actual screenshot/log/error-context/trace files. Each download matched its stored SHA-256; repeated report/file delivery returned replay responses.
+- A linked defect was created and the completed-run comparison showed one fixed test. Reports and exports are written under ignored `.qualityhub-evidence/`.
+- The local run records uncommitted tracked changes as dirty. This experiment does not represent a production outage or real deployed fix.
+- The Java business logic and payment-provider scope are unchanged. Remote CI results are recorded separately after execution.
+
+The initial-release record below is historical.
+
+
 Initial release checked on 30 October 2026 using Java 21.0.4 and Node.js 24.17.0.
 
 ## Executed checks

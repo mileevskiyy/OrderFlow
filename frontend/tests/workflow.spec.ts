@@ -1,5 +1,8 @@
 import{test,expect}from'@playwright/test';
+let injected=false;
+test.afterEach(async({page},info)=>{await info.attach('workflow.log',{body:Buffer.from(`OrderFlow browser workflow\nScenario: ${process.env.QUALITYHUB_SCENARIO||'normal'}\nOrder API 503 injected: ${injected}\nOutcome: ${info.status}\nURL: ${page.url()}\n`),contentType:'text/plain'});});
 test('receive stock, reserve an order, confirm payment, ship and partially return',async({page})=>{
+ if(process.env.QUALITYHUB_INJECT_ORDER_FAILURE==='true'){test.setTimeout(15000);await page.route('**/api/orders',route=>{if(route.request().method()==='POST'){injected=true;return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Controlled integration experiment: order API unavailable'})});}return route.continue();});}
  await page.goto('/');await page.getByLabel('Username',{exact:true}).fill('operator');await page.getByLabel('Password',{exact:true}).fill('local-demo-password');await page.getByRole('button',{name:'Open workspace',exact:true}).click();
  await page.getByRole('button',{name:'Products',exact:true}).click();await page.getByRole('button',{name:'Add product',exact:true}).click();
  const productDialog=page.getByRole('dialog');await productDialog.getByLabel('Product name',{exact:true}).fill('E2E headset');await productDialog.getByLabel('SKU',{exact:true}).fill('E2E-HEADSET');await productDialog.getByLabel('Unit price in USD',{exact:true}).fill('12.99');await productDialog.getByRole('button',{name:'Add product',exact:true}).click();await expect(productDialog).not.toBeVisible();

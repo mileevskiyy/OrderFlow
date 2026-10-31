@@ -29,6 +29,12 @@ The application treats available inventory, historical order prices and retry-sa
 
 **Payments and refunds are simulations.** The application is not connected to a bank, payment processor or shipping carrier. Sample customers and opening inventory are fictional and labelled as demo data.
 
+## Connected QA evidence
+
+The real OrderFlow Chromium workflow can report to QualityHub with stable test identity, retries, screenshot/log/trace attachments and repository/commit/CI context. The CI integration exercises a clearly labelled injected order-API failure followed by normal recovery, checks every downloaded artifact hash, replays delivery and compares the runs. It uses a pinned, private temporary QualityHub instance with generated credentials; results are retained as Actions artifacts rather than depending on a sleeping public demo.
+
+See [integration setup and evidence](docs/QUALITYHUB_INTEGRATION.md). No real payment provider or production outage is implied.
+
 ## Stack and responsibilities
 
 | Layer | Technology | Purpose |
