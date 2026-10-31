@@ -2,6 +2,8 @@
 
 ## Connected QA upgrade — 31 October 2026
 
+Application/test commit `79fcdc0` passed [GitHub Actions run 41201353589](https://github.com/mileevskiyy/OrderFlow/actions/runs/41201353589). Build, H2 checks, PostgreSQL invariants, the pinned QualityHub integration and evidence upload all completed successfully. The temporary target was QualityHub revision `ffa30ef4822f01b6b1c2bb404836a8f76c87af19`.
+
 - `npm run build --prefix frontend`: passed.
 - `node scripts/qualityhub-ci.mjs`: passed against the packaged Java service and sibling QualityHub checkout.
 - A controlled HTTP 503 was actually injected at order creation; its browser invocation failed as required. The same workflow without the injection passed.
