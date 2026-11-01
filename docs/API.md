@@ -80,3 +80,7 @@ Outcome is `SUCCEEDED` or `FAILED`. Event IDs follow the same 8–100 character 
 400: invalid input or missing/invalid operation key. 401: unauthenticated. 403: missing or invalid CSRF verification. 404: missing record. 409: stock conflict, prohibited state transition, invalid return quantity, key conflict, uniqueness violation or lock contention.
 
 After lock contention or an uncertain network response, retry the exact input with the same idempotency key. Do not automatically retry a changed business action under the old key.
+
+## Reservation evidence
+
+Order responses now include `reservation_expires_at_ms` (epoch milliseconds, nullable for historical states), `cancellation_reason`, `cancelled_at` and `payment_review_events`. Expiry preserves status `CANCELLED` and uses reason `RESERVATION_EXPIRED`; manual cancellation uses `OPERATOR_CANCELLED`. Late simulated successes return effect `LATE_SUCCESS_REVIEW`; late failures return `IGNORED_EXPIRED`. These are recorded simulator decisions, not confirmation of external settlement or refund. There is no public endpoint to alter an existing deadline or advance the server clock.

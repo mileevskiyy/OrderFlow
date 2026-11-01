@@ -41,3 +41,7 @@ This is a single-operator application, not a multi-tenant SaaS. Team roles, invi
 Local mode uses file-backed H2 in PostgreSQL compatibility mode. PostgreSQL uses an explicit JDBC connection URL and the same migration. Compatibility mode is a development convenience, not a substitute for executing the tests against PostgreSQL. The CI workflow includes that additional run.
 
 The frontend is packaged into the Spring Boot JAR for one-origin deployment. A React-only static deployment cannot provide the application's authentication, transactions or persistence.
+
+## Reservation deadline transitions
+
+Deadline comparison is `now >= reservation_expires_at_ms`, under the order row lock. Payment and cancellation take the same order-first / sorted-inventory lock order as the expiry worker. The persisted deadline, not an in-memory timer, identifies work after restart. The worker scans at most 100 IDs and calls a separately proxied transactional method for each order. A competing worker rechecks state after acquiring the lock and becomes a no-op. Exceptions roll back order, stock, movement and event changes. Late successful simulator events are retained for review without restoring inventory claims. V2 marks legacy unpaid reservations immediately due; historical paid states are preserved.

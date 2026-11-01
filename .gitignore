@@ -18,3 +18,5 @@ backend/src/main/resources/static/
 
 .qualityhub/
 .qualityhub-evidence/
+
+frontend/expiry-test-results/

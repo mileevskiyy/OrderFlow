@@ -8,9 +8,13 @@ Product catalog, warehouses, stock receipts, transactional reservations, order l
 
 Actual OrderFlow browser workflow delivery to QualityHub, pinned reporter/target, source context, controlled-failure/recovery comparison, attachment hash verification and replay checks. CI exports the experiment evidence. This is separate from the planned business-domain changes below.
 
+## Implemented: reservation deadlines and recovery
+
+Persisted UTC deadline per order; bounded automatic scans and startup recovery; transactional, concurrency-safe stock release; deadline enforcement during payment; explicit late-success review effects and filtering; expiry UI/countdown; V1 migration policy and restart/race/rollback/browser verification. Recovery requires persistent storage; the public demo remains disposable.
+
 ## Next milestones
 
-1. Reservation expiry with an explicit cancellation policy and restart-safe scheduling.
+1. More advanced reservation policies after measuring real operational needs (extensions, admission limits and expiry backlog monitoring).
 2. Operator accounts, roles and persistent sessions.
 3. Inventory transfers between warehouses and damaged-return disposition.
 4. Payment-provider adapter with signed webhooks and transactional outbox delivery.

@@ -7,3 +7,4 @@
 @media(prefers-reduced-motion:reduce){*{animation:none!important}}
 
 .demo-entry{width:100%;justify-content:space-between;margin-top:12px}
+.reservation-notice{padding:16px;margin:18px 0;border:1px solid #d8d3c4;border-radius:8px;background:#f7f3e8;font-size:12px;line-height:1.7}.reservation-notice p{margin-top:6px}.reservation-notice small{display:block;color:#6d7068;margin-top:5px}.reservation-notice.expired{background:#f8eee8;border-color:#e1c8b8}.late-payment-notice{padding:14px;background:#fff0df;border-left:3px solid #bc753e;font-size:12px;line-height:1.7}.badge.EXPIRED{background:#f5e6de;color:#945335}

@@ -33,12 +33,15 @@ jobs:
       - name: Build frontend and verify H2 workflow
         run: ./scripts/build.sh -B
       - name: Verify order invariants against PostgreSQL
-        run: ./mvnw -B test -Dtest=OperationsTests
+        run: ./mvnw -B test -Dtest=OperationsTests,ReservationExpiryTests
         env:
           TEST_DATABASE_URL: jdbc:postgresql://127.0.0.1:5432/orderflow_test
           DB_USER: orderflow
           DB_PASSWORD: ci-test-password
       - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Verify automatic reservation expiry in browser
+        run: npm run test:expiry
         working-directory: frontend
       - name: Check out pinned QualityHub integration target
         uses: actions/checkout@v4

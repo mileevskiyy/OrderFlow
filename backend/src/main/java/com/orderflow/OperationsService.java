@@ -5,7 +5,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.time.Instant;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.*;
@@ -14,9 +14,11 @@ import static com.orderflow.Contracts.*;
 @Service
 public class OperationsService {
  private final JdbcTemplate db;
- public OperationsService(JdbcTemplate db){this.db=db;}
+ private final Clock clock;
+ private final ReservationPolicy reservations;
+ public OperationsService(JdbcTemplate db,Clock clock,ReservationPolicy reservations){this.db=db;this.clock=clock;this.reservations=reservations;}
  static String id(){return UUID.randomUUID().toString();}
- static String now(){return Instant.now().toString();}
+ private String now(){return clock.instant().toString();}
  static long number(Map<String,Object> row,String key){return ((Number)row.get(key)).longValue();}
  private Map<String,Object> one(String sql,Object...args){var rows=db.queryForList(sql,args);if(rows.isEmpty())throw new BusinessException(404,"Record not found");return rows.getFirst();}
  private void event(String order,String action,String detail){db.update("INSERT INTO activity VALUES(?,?,?,?,?)",id(),order,action,detail.length()>1000?detail.substring(0,1000):detail,now());}
@@ -31,8 +33,8 @@ public class OperationsService {
  @Transactional(readOnly=true) public List<Map<String,Object>> products(){return db.queryForList("SELECT * FROM products ORDER BY name");}
  @Transactional(readOnly=true) public List<Map<String,Object>> warehouses(){return db.queryForList("SELECT * FROM warehouses ORDER BY name");}
  @Transactional(readOnly=true) public List<Map<String,Object>> inventory(){return db.queryForList("SELECT i.*,i.on_hand-i.reserved available,p.sku,p.name,p.category,p.price_cents,w.name warehouse_name,w.location FROM inventory i JOIN products p ON i.product_id=p.id JOIN warehouses w ON i.warehouse_id=w.id ORDER BY w.name,p.name");}
- @Transactional(readOnly=true) public List<Map<String,Object>> orders(){return db.queryForList("SELECT o.*,w.name warehouse_name,(SELECT SUM(l.quantity) FROM order_lines l WHERE l.order_id=o.id) units FROM orders o JOIN warehouses w ON o.warehouse_id=w.id ORDER BY o.created_at DESC");}
- @Transactional(readOnly=true) public Map<String,Object> order(String id){var row=new LinkedHashMap<>(one("SELECT o.*,w.name warehouse_name FROM orders o JOIN warehouses w ON o.warehouse_id=w.id WHERE o.id=?",id));row.put("lines",db.queryForList("SELECT * FROM order_lines WHERE order_id=? ORDER BY sku",id));row.put("payments",db.queryForList("SELECT * FROM payment_events WHERE order_id=? ORDER BY created_at",id));row.put("returns",db.queryForList("SELECT * FROM returns WHERE order_id=? ORDER BY created_at",id));row.put("timeline",db.queryForList("SELECT * FROM activity WHERE order_id=? ORDER BY created_at",id));return row;}
+ @Transactional(readOnly=true) public List<Map<String,Object>> orders(){return db.queryForList("SELECT o.*,w.name warehouse_name,(SELECT COUNT(*) FROM payment_events pe WHERE pe.order_id=o.id AND pe.effect='LATE_SUCCESS_REVIEW') payment_review_events,(SELECT SUM(l.quantity) FROM order_lines l WHERE l.order_id=o.id) units FROM orders o JOIN warehouses w ON o.warehouse_id=w.id ORDER BY o.created_at DESC");}
+ @Transactional(readOnly=true) public Map<String,Object> order(String id){var row=new LinkedHashMap<>(one("SELECT o.*,w.name warehouse_name,(SELECT COUNT(*) FROM payment_events pe WHERE pe.order_id=o.id AND pe.effect='LATE_SUCCESS_REVIEW') payment_review_events FROM orders o JOIN warehouses w ON o.warehouse_id=w.id WHERE o.id=?",id));row.put("lines",db.queryForList("SELECT * FROM order_lines WHERE order_id=? ORDER BY sku",id));row.put("payments",db.queryForList("SELECT * FROM payment_events WHERE order_id=? ORDER BY created_at",id));row.put("returns",db.queryForList("SELECT * FROM returns WHERE order_id=? ORDER BY created_at",id));row.put("timeline",db.queryForList("SELECT * FROM activity WHERE order_id=? ORDER BY created_at",id));return row;}
  @Transactional(readOnly=true) public List<Map<String,Object>> activity(){return db.queryForList("SELECT a.*,o.reference FROM activity a LEFT JOIN orders o ON a.order_id=o.id ORDER BY a.created_at DESC LIMIT 100");}
  @Transactional(readOnly=true) public List<Map<String,Object>> movements(){return db.queryForList("SELECT m.*,p.name,p.sku,w.name warehouse_name,o.reference FROM stock_movements m JOIN products p ON m.product_id=p.id JOIN warehouses w ON m.warehouse_id=w.id LEFT JOIN orders o ON m.order_id=o.id ORDER BY m.created_at DESC LIMIT 200");}
  @Transactional(readOnly=true) public Map<String,Object> overview(){return Map.of("orders",one("SELECT COUNT(*) total,COALESCE(SUM(CASE WHEN status='RESERVED' THEN 1 ELSE 0 END),0) awaiting_payment,COALESCE(SUM(CASE WHEN status='PAID' THEN 1 ELSE 0 END),0) ready_to_ship,COALESCE(SUM(CASE WHEN status IN ('PAID','FULFILLED','PARTIALLY_RETURNED','RETURNED') THEN total_cents-refunded_cents ELSE 0 END),0) net_paid_cents,COALESCE(SUM(refunded_cents),0) refunded_cents FROM orders"),"stock",one("SELECT COALESCE(SUM(on_hand),0) on_hand,COALESCE(SUM(reserved),0) reserved,COALESCE(SUM(on_hand-reserved),0) available,COALESCE(SUM(CASE WHEN on_hand-reserved<5 THEN 1 ELSE 0 END),0) low_stock_positions FROM inventory"),"products",one("SELECT COUNT(*) total FROM products").get("total"));}
@@ -46,16 +48,28 @@ public class OperationsService {
   String fingerprint=input.customer().trim()+"|"+input.warehouseId()+"|"+sorted.stream().map(l->l.productId()+":"+l.quantity()).toList();lockKey(scope,key);String previous=replay(scope,key,fingerprint);if(previous!=null)return order(previous);
   one("SELECT id FROM warehouses WHERE id=?",input.warehouseId());long total=0;var snapshots=new ArrayList<Map<String,Object>>();
   for(var line:sorted){var stock=lockStock(input.warehouseId(),line.productId());var product=one("SELECT * FROM products WHERE id=?",line.productId());if(number(stock,"on_hand")-number(stock,"reserved")<line.quantity())throw new BusinessException(409,"Insufficient available stock for "+product.get("name")+". No items were reserved.");total=Math.addExact(total,Math.multiplyExact(number(product,"price_cents"),line.quantity()));snapshots.add(product);}
-  String orderId=id(),reference="OF-"+LocalDate.now(ZoneOffset.UTC).toString().replace("-","").substring(2)+"-"+orderId.substring(0,6).toUpperCase(Locale.ROOT),date=now();db.update("INSERT INTO orders VALUES(?,?,?,?,?,?,0,?,?)",orderId,reference,input.customer().trim(),input.warehouseId(),"RESERVED",total,date,date);
+  String orderId=id(),reference="OF-"+LocalDate.ofInstant(clock.instant(),ZoneOffset.UTC).toString().replace("-","").substring(2)+"-"+orderId.substring(0,6).toUpperCase(Locale.ROOT),date=now();db.update("INSERT INTO orders(id,reference,customer,warehouse_id,status,total_cents,refunded_cents,created_at,updated_at,reservation_expires_at_ms) VALUES(?,?,?,?,?,?,0,?,?,?)",orderId,reference,input.customer().trim(),input.warehouseId(),"RESERVED",total,date,date,clock.millis()+reservations.seconds()*1000);
   for(int i=0;i<sorted.size();i++){var line=sorted.get(i);var product=snapshots.get(i);db.update("INSERT INTO order_lines VALUES(?,?,?,?,?,?,?,0)",id(),orderId,line.productId(),product.get("sku"),product.get("name"),product.get("price_cents"),line.quantity());db.update("UPDATE inventory SET reserved=reserved+? WHERE warehouse_id=? AND product_id=?",line.quantity(),input.warehouseId(),line.productId());movement(input.warehouseId(),line.productId(),orderId,"RESERVE",0,line.quantity(),"Order reservation");}
   remember(scope,key,fingerprint,orderId);event(orderId,"order.reserved","Stock reserved; awaiting simulated payment");return order(orderId);
  }
- @Transactional public Map<String,Object> cancel(String orderId){var order=lockOrder(orderId);String status=(String)order.get("status");if(status.equals("CANCELLED"))return order(orderId);if(!status.equals("RESERVED"))throw new BusinessException(409,"Only unpaid reserved orders can be cancelled.");String warehouse=(String)order.get("warehouse_id");var lines=db.queryForList("SELECT * FROM order_lines WHERE order_id=? ORDER BY product_id",orderId);for(var line:lines){String product=(String)line.get("product_id");int quantity=(int)number(line,"quantity");lockStock(warehouse,product);db.update("UPDATE inventory SET reserved=reserved-? WHERE warehouse_id=? AND product_id=?",quantity,warehouse,product);movement(warehouse,product,orderId,"RELEASE",0,-quantity,"Cancelled unpaid order");}db.update("UPDATE orders SET status='CANCELLED',updated_at=? WHERE id=?",now(),orderId);event(orderId,"order.cancelled","Reservation released");return order(orderId);}
+ private boolean isDue(Map<String,Object> order){return order.get("status").equals("RESERVED")&&(order.get("reservation_expires_at_ms")==null||number(order,"reservation_expires_at_ms")<=clock.millis());}
+ private void releaseReservation(Map<String,Object> order,boolean expired){
+  String orderId=(String)order.get("id"),warehouse=(String)order.get("warehouse_id");
+  var lines=db.queryForList("SELECT * FROM order_lines WHERE order_id=? ORDER BY product_id",orderId);
+  for(var line:lines){String product=(String)line.get("product_id");int quantity=(int)number(line,"quantity");lockStock(warehouse,product);db.update("UPDATE inventory SET reserved=reserved-? WHERE warehouse_id=? AND product_id=?",quantity,warehouse,product);movement(warehouse,product,orderId,"RELEASE",0,-quantity,expired?"Reservation deadline expired":"Cancelled unpaid order");}
+  String date=now();db.update("UPDATE orders SET status='CANCELLED',cancellation_reason=?,cancelled_at=?,updated_at=? WHERE id=?",expired?"RESERVATION_EXPIRED":"OPERATOR_CANCELLED",date,date,orderId);
+  event(orderId,expired?"order.expired":"order.cancelled",expired?"Unpaid reservation expired; reserved stock released without changing physical stock":"Reservation released by operator");
+ }
+ @Transactional(readOnly=true) public List<String> dueReservations(){return db.queryForList("SELECT id FROM orders WHERE status='RESERVED' AND (reservation_expires_at_ms IS NULL OR reservation_expires_at_ms<=?) ORDER BY reservation_expires_at_ms,id LIMIT 100",String.class,clock.millis());}
+ @Transactional public boolean expireReservation(String id){var order=lockOrder(id);if(!isDue(order))return false;releaseReservation(order,true);return true;}
+ @Transactional public Map<String,Object> cancel(String orderId){var order=lockOrder(orderId);String status=(String)order.get("status");if(status.equals("CANCELLED"))return order(orderId);if(!status.equals("RESERVED"))throw new BusinessException(409,"Only unpaid reserved orders can be cancelled.");releaseReservation(order,isDue(order));return order(orderId);}
 
  @Transactional public Map<String,Object> payment(PaymentInput input){
   lockKey("payment",input.eventId());var existing=db.queryForList("SELECT * FROM payment_events WHERE event_id=?",input.eventId());if(!existing.isEmpty()){var e=existing.getFirst();if(!e.get("order_id").equals(input.orderId())||number(e,"amount_cents")!=input.amountCents()||!e.get("outcome").equals(input.outcome()))throw new BusinessException(409,"Payment event ID already belongs to different input.");return Map.of("event",e,"order",order(input.orderId()),"replayed",true);}
-  var order=lockOrder(input.orderId());if(number(order,"total_cents")!=input.amountCents())throw new BusinessException(409,"Payment amount does not match the order total.");String status=(String)order.get("status"),effect;
-  if(status.equals("CANCELLED"))effect="IGNORED_CANCELLED";
+  var order=lockOrder(input.orderId());if(number(order,"total_cents")!=input.amountCents())throw new BusinessException(409,"Payment amount does not match the order total.");if(isDue(order)){releaseReservation(order,true);order=lockOrder(input.orderId());}
+  String status=(String)order.get("status"),effect;
+  if(status.equals("CANCELLED")&&"RESERVATION_EXPIRED".equals(order.get("cancellation_reason")))effect=input.outcome().equals("SUCCEEDED")?"LATE_SUCCESS_REVIEW":"IGNORED_EXPIRED";
+  else if(status.equals("CANCELLED"))effect="IGNORED_CANCELLED";
   else if(!status.equals("RESERVED"))effect="ALREADY_CONFIRMED";
   else if(input.outcome().equals("FAILED"))effect="PAYMENT_FAILED";
   else{effect="CONFIRMED";db.update("UPDATE orders SET status='PAID',updated_at=? WHERE id=?",now(),input.orderId());}

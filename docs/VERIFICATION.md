@@ -1,5 +1,16 @@
 # Verification record
 
+## Reservation-expiry upgrade — 1 November 2026
+
+- Production frontend build and Maven package passed; **21 Java tests passed** locally, with no skips/failures.
+- Seven expiry-domain tests cover the exact deadline, paid-before-deadline protection, worker-independent late-payment rejection, simultaneous sweepers/payment, rollback on audit failure, sweep recovery, multi-line stock reconciliation, manual reasons and creation replay.
+- Two cold-start tests use an actual file-backed H2 database: restart releases an overdue unpaid reservation while preserving a paid one; migration from V1 releases the legacy unpaid row without rewriting creation history.
+- Browser expiry scenario verifies automatic UI refresh, released stock, absent payment action after expiry, late-success review and review filtering; desktop/mobile screenshots are saved. It uses a ten-second isolated lifetime.
+- The existing real OrderFlow → QualityHub controlled-failure/recovery exercise is rechecked against the packaged application.
+- PostgreSQL CI runs both OperationsTests and ReservationExpiryTests. No throughput, hard-real-time expiry, real payment/refund or resolved-review workflow is claimed.
+- Browser expiry artifacts use a separate output directory to avoid collisions with the normal workflow evidence.
+
+
 ## Connected QA upgrade — 31 October 2026
 
 Application/test commit `79fcdc0` passed [GitHub Actions run 41201353589](https://github.com/mileevskiyy/OrderFlow/actions/runs/41201353589). Build, H2 checks, PostgreSQL invariants, the pinned QualityHub integration and evidence upload all completed successfully. The temporary target was QualityHub revision `ffa30ef4822f01b6b1c2bb404836a8f76c87af19`.

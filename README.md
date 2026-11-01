@@ -23,11 +23,28 @@ The application treats available inventory, historical order prices and retry-sa
 - Deliver simulated success/failure payment events, including repeated and late delivery.
 - Fulfill paid orders, reducing both physical stock and active reservations.
 - Cancel unpaid reservations without reducing physical stock.
+- Expire unpaid reservations automatically from persisted deadlines, with restart recovery, transactional release and an explicit late-payment review queue.
 - Record partial or complete returns, restore returned stock and calculate simulated refunds at original prices.
 - Reconcile physical and reserved balances against an append-only application stock ledger.
 - Sign in to the operator workspace using session authentication and CSRF-protected requests.
 
 **Payments and refunds are simulations.** The application is not connected to a bank, payment processor or shipping carrier. Sample customers and opening inventory are fictional and labelled as demo data.
+
+## Unpaid reservation expiry
+
+Every new order stores an absolute UTC deadline. The normal default is **15 minutes**; the disposable public demo uses **60 seconds** so the complete scenario can be tried quickly. Set `RESERVATION_TTL_SECONDS` to 1–86400 seconds, or `0` for the mode default. Changing the setting affects new orders only; retrying the same creation key returns the original deadline and order.
+
+A bounded worker scans up to 100 due orders every five seconds (`RESERVATION_POLL_MS`) and also runs once at application readiness. Each order is locked, rechecked and expired in its own transaction. Releasing all reserved lines, writing stock movements, changing the cancellation reason and appending the audit event either commit together or roll back together. Two workers cannot release the same reservation twice. A failed row is retried by later sweeps. This is database-backed deadline scanning, not a distributed queue or a guarantee of immediate processing during downtime/backlogs.
+
+The payment simulator independently checks the deadline under the same order lock, even when the worker has not run. A success accepted before the deadline stays paid. At or after the deadline, the unpaid order is cancelled with `cancellation_reason=RESERVATION_EXPIRED`; a successful simulator event receives `LATE_SUCCESS_REVIEW` and cannot restore the order or consume stock. Failed late events receive `IGNORED_EXPIRED`. Event replay keeps the original outcome without duplicating stock changes. The acceptance instant is server time while holding the lock, not an unverified upstream event timestamp.
+
+Order details show the deadline, approximate browser countdown and confirmed expiry; visible workspaces refresh every five seconds. **Orders → Late payment — review required** lists orders with retained late-success events. Review is informational in this release: no real charge/refund is sent and no external reconciliation or review-resolution action is implemented. Manual cancellations use `OPERATOR_CANCELLED` and retain their existing ignored-late-event policy.
+
+Flyway V2 adds nullable deadline/reason/cancellation-time fields without changing the existing status vocabulary. Old unpaid V1 rows have no trustworthy deadline and migrate to deadline `0`, becoming immediately eligible for expiry. Paid/historical orders keep their existing state. Physical stock does not decrease when a reservation expires. Restart recovery requires persistent H2/PostgreSQL; the public in-memory demo is intentionally disposable.
+
+Try the public demo: create an unpaid order, keep its details open and wait about a minute. Confirm **Expired**, inspect the timeline and check released inventory. For a fast isolated local browser verification, run `npm run test:expiry --prefix frontend` after building; it uses a ten-second lifetime on port 3203.
+
+![Expired reservation and late-payment handling](docs/reservation-expired.png)
 
 ## Connected QA evidence
 
@@ -146,7 +163,7 @@ stateDiagram-v2
     PARTIALLY_RETURNED --> RETURNED: return remaining units
 ```
 
-A failed payment event leaves the reservation open. A later successful event can confirm it. A successful event delivered after cancellation is recorded as ignored and cannot recreate a reservation or revive the order.
+A failed payment event leaves an unexpired reservation open. A later successful event can confirm it only before its saved deadline. A successful event delivered after cancellation is recorded as ignored and cannot recreate a reservation or revive the order.
 
 ## Engineering challenges and solutions
 
@@ -206,7 +223,7 @@ See [API contracts](docs/API.md) for request shapes, idempotency requirements, s
 - One configured operator account; no customer accounts, team invitations or tenant isolation.
 - Operator details are configured through environment variables. Sessions are in memory and are invalidated by a process restart.
 - No external payment integration, signed payment-provider webhooks, carrier booking or real refund execution.
-- No reservation expiry or automatic cancellation job.
+- Reservation sweeps run only while the process is awake. Persistent databases recover overdue rows on startup; the disposable public demo loses its records on restart.
 - Single USD currency; no tax, discounts, exchange rates or shipping-charge calculation.
 - All returned units are restocked; damaged-stock quarantine is not implemented.
 - Stock ledger and activity endpoints return bounded recent records; order/catalog lists are unpaginated.

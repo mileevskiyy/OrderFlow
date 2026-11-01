@@ -2,7 +2,7 @@ export type OrderStatus='RESERVED'|'PAID'|'FULFILLED'|'PARTIALLY_RETURNED'|'RETU
 export interface Product{id:string;sku:string;name:string;category:string;price_cents:number}
 export interface Warehouse{id:string;name:string;location:string}
 export interface Stock extends Product{product_id:string;warehouse_id:string;warehouse_name:string;on_hand:number;reserved:number;available:number}
-export interface Order{id:string;reference:string;customer:string;warehouse_id:string;warehouse_name:string;status:OrderStatus;total_cents:number;refunded_cents:number;created_at:string;updated_at:string;units:number}
+export interface Order{payment_review_events:number;reservation_expires_at_ms:number|null;cancellation_reason:string|null;cancelled_at:string|null;id:string;reference:string;customer:string;warehouse_id:string;warehouse_name:string;status:OrderStatus;total_cents:number;refunded_cents:number;created_at:string;updated_at:string;units:number}
 export interface OrderLine{id:string;product_id:string;name:string;sku:string;unit_price_cents:number;quantity:number;returned:number}
 export interface Payment{event_id:string;outcome:string;amount_cents:number;effect:string;created_at:string}
 export interface Activity{id:string;reference:string|null;order_id:string|null;action:string;detail:string;created_at:string}

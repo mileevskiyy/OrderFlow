@@ -8,7 +8,7 @@ import java.util.concurrent.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static com.orderflow.Contracts.*;
 
-@SpringBootTest(properties={"spring.datasource.url=${TEST_DATABASE_URL:jdbc:h2:mem:operations;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000}","orderflow.seed=false"})
+@SpringBootTest(properties={"spring.datasource.url=${TEST_DATABASE_URL:jdbc:h2:mem:operations;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000}","orderflow.seed=false","orderflow.expiry-worker=false"})
 class OperationsTests {
  @Autowired OperationsService service;@Autowired JdbcTemplate db;
  String warehouse,product;
