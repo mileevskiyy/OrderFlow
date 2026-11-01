@@ -2,6 +2,10 @@
 
 ## Reservation-expiry upgrade — 1 November 2026
 
+Application commit `2471488` passed [GitHub Actions run 41285018778](https://github.com/mileevskiyy/OrderFlow/actions/runs/41285018778), including all 21 Java checks, the Operations/Expiry domain suites against PostgreSQL, automatic expiry in Chromium and the QualityHub failure/recovery integration. Render deployment `dep-dbjekvfavr4c73c00rog` reached live for that commit. The full expiry/release/late-payment-review browser scenario passed against `https://orderflow-demo-hsq1.onrender.com/` (about 1.3 minutes with the public 60-second lifetime).
+
+The first public attempt reached confirmed expiry but lost the late-payment HTTP connection (ECONNRESET). The browser request helper now permits transport retries only for keyed stock/order writes or payment events carrying a stable event ID; non-idempotent setup writes are not automatically retried. The full public scenario passed afterward.
+
 - Production frontend build and Maven package passed; **21 Java tests passed** locally, with no skips/failures.
 - Seven expiry-domain tests cover the exact deadline, paid-before-deadline protection, worker-independent late-payment rejection, simultaneous sweepers/payment, rollback on audit failure, sweep recovery, multi-line stock reconciliation, manual reasons and creation replay.
 - Two cold-start tests use an actual file-backed H2 database: restart releases an overdue unpaid reservation while preserving a paid one; migration from V1 releases the legacy unpaid row without rewriting creation history.

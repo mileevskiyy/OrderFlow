@@ -2,7 +2,7 @@ import{test,expect}from'@playwright/test';
 test('unpaid reservation expires automatically, releases stock and retains late-payment review',async({page})=>{
  await page.goto('/',{waitUntil:'domcontentloaded'});await page.getByRole('button',{name:'Try the demo',exact:true}).click();await expect(page.getByRole('button',{name:'Orders',exact:true})).toBeVisible();
  const headers={'X-CSRF-TOKEN':(await(await page.request.get('/api/session')).json()).csrfToken};
- async function post(path:string,data:unknown,key?:string){const r=await page.request.post('/api'+path,{headers:{...headers,...(key?{'Idempotency-Key':key}:{})},data});expect(r.ok(),await r.text()).toBe(true);return r.json();}
+ async function post(path:string,data:unknown,key?:string){const r=await page.request.post('/api'+path,{maxRetries:key||path==='/payments/simulate'?2:0,headers:{...headers,...(key?{'Idempotency-Key':key}:{})},data});expect(r.ok(),await r.text()).toBe(true);return r.json();}
  const suffix=Date.now();const warehouse=await post('/warehouses',{name:`Expiry test ${suffix}`,location:'Hong Kong'}),product=await post('/products',{sku:`EXP-${suffix}`,name:`Expiry product ${suffix}`,category:'Test',priceCents:100});
  await post('/inventory/receive',{warehouseId:warehouse.id,productId:product.id,quantity:3,reason:'Synthetic expiry verification'},`expiry-stock-${suffix}`);
  const order=await post('/orders',{customer:`Expiry buyer ${suffix}`,warehouseId:warehouse.id,lines:[{productId:product.id,quantity:2}]},`expiry-order-${suffix}`);
